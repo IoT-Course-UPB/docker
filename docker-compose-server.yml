@@ -1,0 +1,82 @@
+version: "3.8"
+
+services:
+    postgres:
+        image: postgres
+        environment:
+            POSTGRES_DB: devices
+            POSTGRES_USER: admin
+            POSTGRES_PASSWORD: admin
+        volumes:
+            - "${PWD}/database/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql"
+        networks:
+            - db-network
+
+    adminer:
+        image: adminer
+        ports:
+            - 8080:8080
+        networks:
+            - db-network
+
+    prometheus:
+        image: prom/prometheus
+        volumes:
+            - "${PWD}/configs/prometheus.yml:/etc/prometheus/prometheus.yml"
+        ports:
+            - 9090:9090
+        networks:
+            - prom
+
+    rabbitmq:
+        image: rabbitmq:management-alpine
+        ports:
+            - 5672:5672
+            - 15672:15672
+        networks:
+            - rmq
+        hostname: rabbitmq
+
+    server:
+        image: mobylab/ac-server:lab4
+        ports:
+            - 6000:6000
+        environment:
+            POSTGRES_DB: devices
+            POSTGRES_USER: admin
+            POSTGRES_PASSWORD: admin
+        depends_on:
+            - rabbitmq
+            - postgres
+        networks:
+            - db-network
+            - prom
+            - rmq
+
+    thermostat:
+        image: mobylab/ac-device:lab4
+        ports:
+            - 5000:5000
+        environment:
+            D_NAME: "thermostat"
+            D_TYPE: 3
+            D_DESC: "This is a thermostat"
+            S_METRIC: "temperature"
+            S_UNIT: "degrees Celsius"
+            S_MIN: 10
+            S_MAX: 25
+            S_STEP: 0.5
+            S_INT: 1
+            A_UNIT: "degrees Celsius"
+            A_BIN: 0
+            A_MIN: 10
+            A_MAX: 25
+        depends_on:
+            - rabbitmq
+        networks:
+            - rmq
+
+networks:
+    db-network:
+    rmq:
+    prom:
